@@ -87,9 +87,10 @@ public class S3Provider extends BaseVFSConnectionProvider<S3Details> {
 
   @Override
   public FileSystemOptions getOpts( S3Details s3Details ) {
+    FileSystemOptions opts = super.getOpts( s3Details );
+
     VariableSpace space = getSpace( s3Details );
-    S3CommonFileSystemConfigBuilder s3CommonFileSystemConfigBuilder =
-      new S3CommonFileSystemConfigBuilder( new FileSystemOptions() );
+    S3CommonFileSystemConfigBuilder s3CommonFileSystemConfigBuilder = new S3CommonFileSystemConfigBuilder( opts );
     s3CommonFileSystemConfigBuilder.setName( getVar( s3Details.getName(), space ) );
     s3CommonFileSystemConfigBuilder.setAccessKey( getVar( s3Details.getAccessKey(), space ) );
     s3CommonFileSystemConfigBuilder.setSecretKey( getVar( s3Details.getSecretKey(), space ) );
@@ -102,7 +103,8 @@ public class S3Provider extends BaseVFSConnectionProvider<S3Details> {
     s3CommonFileSystemConfigBuilder.setSignatureVersion( getVar( s3Details.getSignatureVersion(), space ) );
     s3CommonFileSystemConfigBuilder.setDefaultS3Config( getVar( s3Details.getDefaultS3Config(), space ) );
     s3CommonFileSystemConfigBuilder.setConnectionType( getVar( s3Details.getConnectionType(), space ) );
-    return s3CommonFileSystemConfigBuilder.getFileSystemOptions();
+
+    return opts;
   }
 
   @SuppressWarnings( "unchecked" )

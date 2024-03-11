@@ -27,11 +27,13 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.vfs2.FileName;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.FileType;
 import org.apache.commons.vfs2.provider.AbstractFileName;
 import org.apache.commons.vfs2.provider.AbstractFileObject;
+import org.pentaho.di.connections.vfs.builder.RootLocationConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,12 +55,14 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
   protected S3Object s3Object;
   protected ObjectMetadata s3ObjectMetadata;
 
+  protected FileName physicalFileName;
+
   protected S3CommonFileObject( final AbstractFileName name, final S3CommonFileSystem fileSystem ) {
     super( name, fileSystem );
     this.fileSystem = fileSystem;
-    this.bucketName = getS3BucketName();
-    this.key = getBucketRelativeS3Path();
   }
+
+  protected abstract AbstractFileName parseUri( String uri ) throws FileSystemException;
 
   @Override
   protected long doGetContentSize() {
@@ -72,7 +76,6 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
     S3Object streamS3Object = getS3Object();
     return new S3CommonFileInputStream( streamS3Object.getObjectContent(), streamS3Object );
   }
-
 
   @Override public void createFile() throws FileSystemException {
     //PDI-19598: Copied from super.createFile() but it was a way to force the file creation on S3
@@ -117,8 +120,8 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
     return childrenList.toArray( childrenArr );
   }
 
-  protected String getS3BucketName() {
-    String bucket = getName().getPath();
+  protected String buildS3BucketName() {
+    String bucket = getPhysicalFileName().getPath();
     if ( bucket.indexOf( DELIMITER, 1 ) > 1 ) {
       // this file is a file, to get the bucket, remove the name from the path
       bucket = bucket.substring( 1, bucket.indexOf( DELIMITER, 1 ) );
@@ -128,6 +131,25 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
     }
     return bucket;
   }
+
+  protected FileName buildPhysicalName() {
+    FileName fileName = getName();
+
+    String location = new RootLocationConfigurationBuilder( fileSystem.getFileSystemOptions() ).getRootLocation();
+    if ( location == null ) {
+      return fileName;
+    }
+
+    AbstractFileName locationName = null;
+    try {
+      locationName = parseUri(location);
+    } catch( FileSystemException fileSystemException ){
+
+    }
+
+    return locationName.createName( locationName.getPath() + fileName.getPath(), fileName.getType() );
+  }
+
 
   protected List<String> getS3ObjectsFromVirtualFolder( String key, String bucketName ) {
     List<String> childrenList = new ArrayList<>();
@@ -183,16 +205,17 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
     }
   }
 
-  protected String getBucketRelativeS3Path() {
-    if ( getName().getPath().indexOf( DELIMITER, 1 ) >= 0 ) {
-      return getName().getPath().substring( getName().getPath().indexOf( DELIMITER, 1 ) + 1 );
+  protected String buildBucketRelativeS3Path() {
+    String physicalName = getPhysicalFileName().getPath();
+    if ( physicalName.indexOf( DELIMITER, 1 ) >= 0 ) {
+      return physicalName.substring( physicalName.indexOf( DELIMITER, 1 ) + 1 );
     } else {
       return "";
     }
   }
 
   @VisibleForTesting
-  public S3Object getS3Object() {
+  S3Object getS3Object() {
     return getS3Object( this.key, this.bucketName );
   }
 
@@ -212,8 +235,14 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
 
   @Override
   public void doAttach() throws Exception {
-    logger.debug( "Attach called on {}", getQualifiedName() );
     injectType( FileType.IMAGINARY );
+
+    physicalFileName = buildPhysicalName();
+    bucketName = buildS3BucketName();
+    key = buildBucketRelativeS3Path();
+
+    // qualified name depends on key and bucket name which are computed in previous lines
+    logger.debug( "Attach called on {}", getQualifiedName() );
 
     if ( isRootBucket() ) {
       // cannot attach to root bucket but still need to figure out the type for exists()
@@ -231,7 +260,7 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
     try {
       // 1. Is it an existing file?
       s3ObjectMetadata = fileSystem.getS3Client().getObjectMetadata( bucketName, key );
-      injectType( getName().getType() ); // if this worked then the automatically detected type is right
+      injectType( getPhysicalFileName().getType() ); // if this worked then the automatically detected type is right
     } catch ( AmazonS3Exception e ) { // S3 object doesn't exist
       // 2. Is it in reality a folder?
       handleAttachException( key, bucketName );
@@ -410,5 +439,9 @@ public abstract class S3CommonFileObject extends AbstractFileObject<S3CommonFile
 
   protected String getQualifiedName( S3CommonFileObject s3nFileObject ) {
     return s3nFileObject.bucketName + "/" + s3nFileObject.key;
+  }
+
+  protected FileName getPhysicalFileName() {
+    return physicalFileName;
   }
 }

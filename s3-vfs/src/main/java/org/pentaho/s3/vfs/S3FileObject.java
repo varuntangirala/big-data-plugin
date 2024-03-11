@@ -45,13 +45,16 @@ public class S3FileObject extends S3CommonFileObject {
 
   protected S3FileObject( final AbstractFileName name, final S3FileSystem fileSystem ) {
     super( name, fileSystem );
-    //bucket name needs to be adjusted
-    this.bucketName = getS3BucketName();
   }
 
   @Override
-  protected String getS3BucketName() {
-    String s3BucketName = getName().getPath();
+  protected AbstractFileName parseUri( String uri ) throws FileSystemException {
+    return (AbstractFileName) S3FileNameParser.getInstance().parseUri( null, null, uri );
+  }
+
+  @Override
+  protected String buildS3BucketName() {
+    String s3BucketName = getPhysicalFileName().getPath();
     if ( s3BucketName.indexOf( DELIMITER, 1 ) > 1 ) {
       // this file is a file, to get the bucket, remove the name from the path
       s3BucketName = s3BucketName.substring( 0, s3BucketName.indexOf( DELIMITER, 1 ) );

@@ -77,6 +77,9 @@ public class S3Details implements VFSConnectionDetails {
 
   @MetaStoreAttribute private String connectionType;
 
+  @MetaStoreAttribute
+  private String rootLocation;
+
   @Override public String getName() {
     return name;
   }
@@ -144,6 +147,26 @@ public class S3Details implements VFSConnectionDetails {
 
   public void setAuthType( String authType ) {
     this.authType = authType;
+  }
+
+  @Override
+  public String getRootLocation() {
+    return rootLocation;
+  }
+
+  @Override
+  public void setRootLocation( String rootPath ) {
+    this.rootLocation = rootPath;
+  }
+
+  @Override
+  public boolean isSupportsRootLocation() {
+    return true;
+  }
+
+  @Override
+  public boolean isRootLocationRequired() {
+    return false;
   }
 
   public List<String> getRegions() {
@@ -243,6 +266,7 @@ public class S3Details implements VFSConnectionDetails {
     props.put( "pathStyleAccess", getPathStyleAccess() );
     props.put( "defaultS3Config", getDefaultS3Config() );
     props.put( "connectionType", getConnectionType() );
+//    props.put( "rootPath", getRootPath() );
 
     return props;
   }

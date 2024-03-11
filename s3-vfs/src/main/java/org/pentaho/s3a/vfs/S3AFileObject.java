@@ -17,6 +17,7 @@
 
 package org.pentaho.s3a.vfs;
 
+import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.provider.AbstractFileName;
 import org.pentaho.s3common.S3CommonFileObject;
 
@@ -24,5 +25,10 @@ public class S3AFileObject extends S3CommonFileObject {
 
   S3AFileObject( final AbstractFileName name, final S3AFileSystem fileSystem ) {
     super( name, fileSystem );
+  }
+
+  @Override
+  protected AbstractFileName parseUri( String uri ) throws FileSystemException {
+    return (AbstractFileName) S3AFileNameParser.getInstance().parseUri( null, null, uri );
   }
 }
